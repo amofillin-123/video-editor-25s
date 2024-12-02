@@ -1,0 +1,9 @@
+[server]
+address = "localhost"
+port = 8502
+enableCORS = false
+enableXsrfProtection = false
+
+[browser]
+serverAddress = "localhost"
+serverPort = 8502

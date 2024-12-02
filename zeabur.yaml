@@ -1,0 +1,6 @@
+services:
+  - name: web
+    dockerfile: Dockerfile
+    env:
+      - name: PORT
+        value: 8080

@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>视频自动剪辑</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3.2.31"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            margin: 20px 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .upload-area:hover {
+            border-color: #2196F3;
+            background-color: #f8f9fa;
+        }
+        .upload-area.dragging {
+            border-color: #2196F3;
+            background-color: #e3f2fd;
+        }
+        .btn {
+            background-color: #2196F3;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        .btn:hover {
+            background-color: #1976D2;
+        }
+        .btn:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #f0f0f0;
+            border-radius: 10px;
+            margin: 20px 0;
+            overflow: hidden;
+        }
+        .progress {
+            height: 100%;
+            background-color: #4CAF50;
+            transition: width 0.3s ease;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .error {
+            background-color: #ffebee;
+            color: #c62828;
+        }
+        .success {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+        }
+    </style>
+</head>
+<body>
+    <div id="app" class="container">
+        <h1>视频自动剪辑</h1>
+        <div
+            class="upload-area"
+            :class="{ dragging: isDragging }"
+            @dragenter.prevent="isDragging = true"
+            @dragleave.prevent="isDragging = false"
+            @dragover.prevent
+            @drop.prevent="handleDrop"
+            @click="triggerFileInput"
+        >
+            <input
+                type="file"
+                ref="fileInput"
+                style="display: none"
+                @change="handleFileSelect"
+                accept="video/*"
+            >
+            <div v-if="!file">
+                拖放视频文件到这里或点击上传<br>
+                <small>支持的格式：MP4, AVI, MOV, MKV</small>
+            </div>
+            <div v-else>
+                已选择: {{ file.name }}
+            </div>
+        </div>
+
+        <div v-if="uploading" class="progress-bar">
+            <div class="progress" :style="{ width: progress + '%' }"></div>
+        </div>
+
+        <div v-if="status" :class="['status', status.type]">
+            {{ status.message }}
+        </div>
+
+        <button 
+            class="btn" 
+            @click="uploadFile" 
+            :disabled="!file || uploading"
+        >
+            {{ uploading ? '处理中...' : '开始处理' }}
+        </button>
+
+        <div v-if="downloadUrl" style="margin-top: 20px;">
+            <a :href="downloadUrl" class="btn" download>下载处理后的视频</a>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue
+
+        createApp({
+            data() {
+                return {
+                    file: null,
+                    uploading: false,
+                    progress: 0,
+                    isDragging: false,
+                    status: null,
+                    downloadUrl: null
+                }
+            },
+            methods: {
+                triggerFileInput() {
+                    this.$refs.fileInput.click()
+                },
+                handleFileSelect(event) {
+                    const file = event.target.files[0]
+                    if (file) {
+                        this.validateAndSetFile(file)
+                    }
+                },
+                handleDrop(event) {
+                    this.isDragging = false
+                    const file = event.dataTransfer.files[0]
+                    if (file) {
+                        this.validateAndSetFile(file)
+                    }
+                },
+                validateAndSetFile(file) {
+                    const validTypes = ['video/mp4', 'video/avi', 'video/quicktime', 'video/x-matroska']
+                    if (validTypes.includes(file.type)) {
+                        this.file = file
+                        this.status = null
+                        this.downloadUrl = null
+                    } else {
+                        this.status = {
+                            type: 'error',
+                            message: '不支持的文件格式'
+                        }
+                    }
+                },
+                async uploadFile() {
+                    if (!this.file) return
+
+                    const formData = new FormData()
+                    formData.append('video', this.file)
+
+                    this.uploading = true
+                    this.progress = 0
+                    this.status = null
+                    this.downloadUrl = null
+
+                    try {
+                        const response = await axios.post('/api/upload', formData, {
+                            onUploadProgress: (progressEvent) => {
+                                this.progress = Math.round(
+                                    (progressEvent.loaded * 100) / progressEvent.total
+                                )
+                            }
+                        })
+
+                        this.status = {
+                            type: 'success',
+                            message: '视频处理成功！'
+                        }
+                        this.downloadUrl = `/api/download/${response.data.filename}`
+                    } catch (error) {
+                        this.status = {
+                            type: 'error',
+                            message: error.response?.data?.error || '上传失败，请重试'
+                        }
+                    } finally {
+                        this.uploading = false
+                    }
+                }
+            }
+        }).mount('#app')
+    </script>
+</body>
+</html>
