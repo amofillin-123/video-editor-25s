@@ -68,14 +68,20 @@ def upload_file():
             
             if success:
                 app.logger.info('视频处理成功')
+                # 检查带扩展名和不带扩展名的文件是否存在
                 if os.path.exists(output_path):
-                    return jsonify({
-                        'message': '视频处理成功',
-                        'filename': output_filename
-                    })
+                    actual_output_path = output_path
+                elif os.path.exists(output_path + '.mp4'):
+                    actual_output_path = output_path + '.mp4'
+                    output_filename = output_filename + '.mp4'
                 else:
                     app.logger.error('输出文件不存在')
                     return jsonify({'error': '视频处理失败：输出文件不存在'}), 500
+                
+                return jsonify({
+                    'message': '视频处理成功',
+                    'filename': output_filename
+                })
             else:
                 app.logger.error('视频处理失败')
                 return jsonify({'error': '视频处理失败'}), 500
