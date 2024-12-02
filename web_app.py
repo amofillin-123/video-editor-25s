@@ -99,7 +99,16 @@ def upload_file():
 def download_file(filename):
     file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     if os.path.exists(file_path):
-        return send_file(file_path, as_attachment=True)
+        # 获取文件扩展名
+        _, ext = os.path.splitext(filename)
+        # 设置正确的 MIME 类型
+        mime_type = 'video/mp4' if ext.lower() == '.mp4' else 'video/quicktime'
+        return send_file(
+            file_path,
+            mimetype=mime_type,
+            as_attachment=True,
+            download_name=f"edited_video{ext}"  # 确保下载时有正确的扩展名
+        )
     return jsonify({'error': '文件不存在'}), 404
 
 if __name__ == '__main__':
