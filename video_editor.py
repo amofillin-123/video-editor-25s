@@ -33,14 +33,14 @@ class VideoEditor:
             return False
 
     def _extract_video_segment(self, start, duration, output_path):
-        """提取视频片段（不带音频）"""
+        """提取视频片段（保留音频）"""
         command = [
             'ffmpeg', '-y',
             '-i', self.input_path,
             '-ss', str(start),
             '-t', str(duration),
-            '-an',  # 不要音频
             '-c:v', 'copy',  # 直接复制视频流，不重新编码
+            '-c:a', 'copy',  # 直接复制音频流，不重新编码
             output_path
         ]
         return self._run_ffmpeg(command)
@@ -147,34 +147,6 @@ class VideoEditor:
         
         return selected_scenes
 
-    def _extract_audio(self, duration, output_path):
-        """提取音频，使用指定的时长"""
-        command = [
-            'ffmpeg', '-y',
-            '-i', self.input_path,
-            '-t', str(duration),  # 使用计算出的总时长
-            '-vn',  # 不要视频
-            '-acodec', 'aac',
-            '-ac', '2',
-            '-ar', '44100',
-            '-b:a', '128k',
-            output_path
-        ]
-        return self._run_ffmpeg(command)
-
-    def _add_audio_to_video(self, video_path, audio_path, output_path):
-        """将音频添加到视频中"""
-        command = [
-            'ffmpeg', '-y',
-            '-i', video_path,
-            '-i', audio_path,
-            '-c:v', 'copy',
-            '-c:a', 'aac',
-            '-strict', 'experimental',
-            output_path
-        ]
-        return self._run_ffmpeg(command)
-
     def process_video(self, progress_callback=None):
         """处理视频的主要方法"""
         self.progress_callback = progress_callback
@@ -220,18 +192,10 @@ class VideoEditor:
                 self.progress_callback(40)  # 40% 进度
                 
             selected_scenes = self._select_scenes(scenes, total_duration)
-            
-            # 计算选中场景的总时长
             total_selected_duration = sum(end - start for start, end in selected_scenes)
             print(f"选中场景总时长: {total_selected_duration:.1f}秒")
 
-            # 提取音频（使用计算出的总时长）
-            temp_audio = os.path.join(self.temp_dir, 'audio.aac')
-            if not self._extract_audio(total_selected_duration, temp_audio):
-                print("警告：提取音频失败")
-                temp_audio = None
-
-            # 提取选中的场景
+            # 提取选中的场景（带音频）
             print("提取选中的场景...")
             if self.progress_callback:
                 self.progress_callback(60)  # 60% 进度
@@ -250,30 +214,14 @@ class VideoEditor:
             print("合并场景...")
             if self.progress_callback:
                 self.progress_callback(80)  # 80% 进度
-            temp_video = os.path.join(self.temp_dir, 'no_audio_output.mp4')
-            if not self._concat_videos(video_segments, temp_video):
+
+            # 确保输出路径有 .mp4 扩展名
+            if not self.output_path.lower().endswith('.mp4'):
+                self.output_path = f"{self.output_path}.mp4"
+
+            if not self._concat_videos(video_segments, self.output_path):
                 print("错误：合并视频片段失败")
                 return False
-
-            # 添加音频（如果有）
-            if temp_audio:
-                print("添加音频...")
-                command = [
-                    'ffmpeg', '-y',
-                    '-i', temp_video,
-                    '-i', temp_audio,
-                    '-c:v', 'copy',  # 保持视频流不变
-                    '-c:a', 'aac',
-                    '-b:a', '320k',  # 使用最高音频比特率
-                    '-shortest',  # 使用最短的流的长度
-                    self.output_path
-                ]
-                if not self._run_ffmpeg(command):
-                    print("错误：添加音频失败")
-                    return False
-            else:
-                # 如果没有音频，直接复制视频
-                shutil.copy2(temp_video, self.output_path)
 
             # 清理临时文件
             print("清理资源...")
