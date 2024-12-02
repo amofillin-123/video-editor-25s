@@ -83,6 +83,7 @@
     </style>
 </head>
 <body>
+    {% raw %}
     <div id="app" class="container">
         <h1>视频自动剪辑</h1>
         <div
@@ -130,9 +131,7 @@
             <a :href="downloadUrl" class="btn" download>下载处理后的视频</a>
         </div>
     </div>
-
     <script>
-        {% raw %}
         const { createApp } = Vue
 
         createApp({
@@ -212,7 +211,7 @@
                 }
             }
         }).mount('#app')
-        {% endraw %}
     </script>
+    {% endraw %}
 </body>
 </html>
