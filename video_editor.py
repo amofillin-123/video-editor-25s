@@ -93,8 +93,12 @@ class VideoEditor:
         start_scenes = scene_durations[:2]
         start_duration = sum(duration for duration, _, _ in start_scenes)
         
-        # 保留结尾的两个场景
+        # 保留结尾的两个场景，但稍微缩短最后一个场景
         end_scenes = scene_durations[-2:]
+        if end_scenes:
+            last_duration, last_start, last_end = end_scenes[-1]
+            # 从最后一个场景减去0.1秒，避免黑屏帧
+            end_scenes[-1] = (last_duration - 0.1, last_start, last_end - 0.1)
         end_duration = sum(duration for duration, _, _ in end_scenes)
         
         # 中间场景
