@@ -221,25 +221,22 @@ class VideoEditor:
             # 添加音频（如果有）
             if temp_audio:
                 print("添加音频...")
+                # 确保输出路径有 .mp4 扩展名
+                output_path = self.output_path if self.output_path.lower().endswith('.mp4') else f"{self.output_path}.mp4"
                 command = [
                     'ffmpeg', '-y',
                     '-i', temp_video,
                     '-i', temp_audio,
-                    '-c:v', 'copy',     # 保持视频流不变
-                    '-c:a', 'aac',      # 使用 AAC 编码器
-                    '-strict', 'experimental',  # 允许实验性编码器
-                    '-map', '0:v:0',    # 从第一个输入取视频
-                    '-map', '1:a:0',    # 从第二个输入取音频
-                    '-shortest',        # 使用最短的流的长度
-                    self.output_path
+                    '-c:v', 'copy',
+                    '-c:a', 'aac',
+                    '-strict', 'experimental',
+                    output_path
                 ]
                 if not self._run_ffmpeg(command):
                     print("错误：添加音频失败")
-                    # 确保输出路径有 .mp4 扩展名
-                    output_path = self.output_path if self.output_path.lower().endswith('.mp4') else f"{self.output_path}.mp4"
                     # 如果添加音频失败，尝试直接使用视频
                     shutil.copy2(temp_video, output_path)
-                    self.output_path = output_path  # 更新输出路径
+                    self.output_path = output_path
                     print("已保存无音频版本")
             else:
                 # 确保输出路径有 .mp4 扩展名
