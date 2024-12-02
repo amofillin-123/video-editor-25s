@@ -165,22 +165,6 @@ class VideoEditor:
                 print("错误：视频时长不足25秒")
                 return False
 
-            # 提取音频（仅前25秒）
-            print("提取音频...")
-            temp_audio = os.path.join(self.temp_dir, "temp_audio.mp3")
-            command = [
-                'ffmpeg', '-y',
-                '-i', self.input_path,
-                '-t', str(self.target_duration),
-                '-vn',
-                '-acodec', 'libmp3lame',
-                '-q:a', '0',  # 最高质量
-                temp_audio
-            ]
-            if not self._run_ffmpeg(command):
-                print("警告：提取音频失败")
-                temp_audio = None
-
             # 检测场景
             print("检测场景变化...")
             if self.progress_callback:
@@ -197,6 +181,26 @@ class VideoEditor:
                 self.progress_callback(40)  # 40% 进度
                 
             selected_scenes = self._select_scenes(scenes, total_duration)
+            
+            # 计算选中场景的总时长
+            total_selected_duration = sum(end - start for start, end in selected_scenes)
+            print(f"选中场景总时长: {total_selected_duration:.1f}秒")
+
+            # 提取音频（使用实际场景总时长）
+            print("提取音频...")
+            temp_audio = os.path.join(self.temp_dir, "temp_audio.mp3")
+            command = [
+                'ffmpeg', '-y',
+                '-i', self.input_path,
+                '-t', str(total_selected_duration),  # 使用实际场景总时长
+                '-vn',
+                '-acodec', 'libmp3lame',
+                '-q:a', '0',  # 最高质量
+                temp_audio
+            ]
+            if not self._run_ffmpeg(command):
+                print("警告：提取音频失败")
+                temp_audio = None
 
             # 提取选中的场景
             print("提取选中的场景...")
