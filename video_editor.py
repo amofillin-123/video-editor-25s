@@ -136,6 +136,34 @@ class VideoEditor:
         
         return selected_scenes
 
+    def _extract_audio(self, duration, output_path):
+        """提取音频，使用指定的时长"""
+        command = [
+            'ffmpeg', '-y',
+            '-i', self.input_path,
+            '-t', str(duration),  # 使用计算出的总时长
+            '-vn',  # 不要视频
+            '-acodec', 'aac',
+            '-ac', '2',
+            '-ar', '44100',
+            '-b:a', '128k',
+            output_path
+        ]
+        return self._run_ffmpeg(command)
+
+    def _add_audio_to_video(self, video_path, audio_path, output_path):
+        """将音频添加到视频中"""
+        command = [
+            'ffmpeg', '-y',
+            '-i', video_path,
+            '-i', audio_path,
+            '-c:v', 'copy',
+            '-c:a', 'aac',
+            '-strict', 'experimental',
+            output_path
+        ]
+        return self._run_ffmpeg(command)
+
     def process_video(self, progress_callback=None):
         """处理视频的主要方法"""
         self.progress_callback = progress_callback
@@ -186,21 +214,11 @@ class VideoEditor:
             total_selected_duration = sum(end - start for start, end in selected_scenes)
             print(f"选中场景总时长: {total_selected_duration:.1f}秒")
 
-            # 提取音频（使用实际场景总时长）
-            print("提取音频...")
-            temp_audio = os.path.join(self.temp_dir, "temp_audio.mp3")
-            command = [
-                'ffmpeg', '-y',
-                '-i', self.input_path,
-                '-t', str(total_selected_duration),  # 使用实际场景总时长
-                '-vn',
-                '-acodec', 'libmp3lame',
-                '-q:a', '0',  # 最高质量
-                temp_audio
-            ]
-            if not self._run_ffmpeg(command):
+            # 提取音频（使用计算出的总时长）
+            audio_path = os.path.join(self.temp_dir, 'audio.aac')
+            if not self._extract_audio(total_selected_duration, audio_path):
                 print("警告：提取音频失败")
-                temp_audio = None
+                audio_path = None
 
             # 提取选中的场景
             print("提取选中的场景...")
@@ -221,36 +239,27 @@ class VideoEditor:
             print("合并场景...")
             if self.progress_callback:
                 self.progress_callback(80)  # 80% 进度
-            temp_video = os.path.join(self.temp_dir, "temp_video.mp4")
-            if not self._concat_videos(video_segments, temp_video):
+            no_audio_output = os.path.join(self.temp_dir, 'no_audio_output.mp4')
+            if not self._concat_videos(video_segments, no_audio_output):
                 print("错误：合并视频片段失败")
                 return False
 
             # 添加音频（如果有）
-            if temp_audio:
+            if audio_path:
                 print("添加音频...")
                 # 确保输出路径有 .mp4 扩展名
                 output_path = self.output_path if self.output_path.lower().endswith('.mp4') else f"{self.output_path}.mp4"
-                command = [
-                    'ffmpeg', '-y',
-                    '-i', temp_video,
-                    '-i', temp_audio,
-                    '-c:v', 'copy',
-                    '-c:a', 'aac',
-                    '-strict', 'experimental',
-                    output_path
-                ]
-                if not self._run_ffmpeg(command):
+                if not self._add_audio_to_video(no_audio_output, audio_path, output_path):
                     print("错误：添加音频失败")
                     # 如果添加音频失败，尝试直接使用视频
-                    shutil.copy2(temp_video, output_path)
+                    shutil.copy2(no_audio_output, output_path)
                     self.output_path = output_path
                     print("已保存无音频版本")
             else:
                 # 确保输出路径有 .mp4 扩展名
                 output_path = self.output_path if self.output_path.lower().endswith('.mp4') else f"{self.output_path}.mp4"
                 # 如果没有音频，直接复制视频
-                shutil.copy2(temp_video, output_path)
+                shutil.copy2(no_audio_output, output_path)
                 self.output_path = output_path  # 更新输出路径
 
             # 清理临时文件
