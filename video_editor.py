@@ -65,16 +65,16 @@ class VideoEditor:
     def _detect_scenes(self):
         """使用 PySceneDetect 检测场景"""
         try:
-            # 使用内容检测器，阈值设置为较高以避免过度分割
-            scenes = detect(self.input_path, ContentDetector(threshold=30))
+            # 使用内容检测器，降低阈值以获得更自然的场景分割
+            scenes = detect(self.input_path, ContentDetector(threshold=27, min_scene_len=15))
             # 转换为时间戳列表
             scene_list = []
             for scene in scenes:
                 start_time = float(scene[0].get_seconds())
                 end_time = float(scene[1].get_seconds())
                 duration = end_time - start_time
-                # 过滤掉太短的场景（小于0.5秒）
-                if duration >= 0.5:
+                # 过滤掉太短的场景（小于1秒）
+                if duration >= 1.0:
                     scene_list.append((start_time, end_time))
             return scene_list
         except Exception as e:
@@ -89,16 +89,12 @@ class VideoEditor:
         # 计算每个场景的时长
         scene_durations = [(end - start, start, end) for start, end in scenes]
         
-        # 保留开头的两个场景
+        # 保留开头的场景（1-2个）
         start_scenes = scene_durations[:2]
         start_duration = sum(duration for duration, _, _ in start_scenes)
         
-        # 保留结尾的两个场景，但稍微缩短最后一个场景
+        # 保留结尾的场景（1-2个）
         end_scenes = scene_durations[-2:]
-        if end_scenes:
-            last_duration, last_start, last_end = end_scenes[-1]
-            # 从最后一个场景减去0.1秒，避免黑屏帧
-            end_scenes[-1] = (last_duration - 0.1, last_start, last_end - 0.1)
         end_duration = sum(duration for duration, _, _ in end_scenes)
         
         # 中间场景
@@ -110,22 +106,37 @@ class VideoEditor:
         if target_middle_duration <= 0:
             # 如果开头和结尾已经超过目标时长，只保留它们的一部分
             selected_scenes = [(start, end) for _, start, end in (start_scenes + end_scenes)]
-            return selected_scenes[:int(self.target_duration)]
+            # 确保不超过目标时长
+            total_time = 0
+            final_scenes = []
+            for start, end in selected_scenes:
+                duration = end - start
+                if total_time + duration > self.target_duration:
+                    # 如果加上这个场景会超时，就截断它
+                    end = start + (self.target_duration - total_time)
+                    final_scenes.append((start, end))
+                    break
+                final_scenes.append((start, end))
+                total_time += duration
+            return final_scenes
         
-        # 随机选择中间场景
+        # 随机选择中间场景，但优先选择较长的场景
         selected_middle_scenes = []
         current_duration = 0
         
-        # 随机打乱中间场景的顺序，但保持时间上的相对顺序
-        available_scenes = list(middle_scenes)
+        # 按时长排序中间场景，优先选择较长的场景
+        available_scenes = sorted(middle_scenes, key=lambda x: x[0], reverse=True)
         while available_scenes and current_duration < target_middle_duration:
-            # 选择一个随机场景
-            scene_index = random.randint(0, len(available_scenes) - 1)
-            duration, start, end = available_scenes.pop(scene_index)
+            duration, start, end = available_scenes.pop(0)
             
             if current_duration + duration <= target_middle_duration:
                 selected_middle_scenes.append((start, end))
                 current_duration += duration
+            elif current_duration < target_middle_duration:
+                # 如果这个场景太长，截取需要的部分
+                needed_duration = target_middle_duration - current_duration
+                selected_middle_scenes.append((start, start + needed_duration))
+                current_duration = target_middle_duration
         
         # 按时间顺序合并所有选中的场景
         selected_scenes = (
