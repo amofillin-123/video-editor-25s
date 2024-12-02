@@ -235,12 +235,18 @@ class VideoEditor:
                 ]
                 if not self._run_ffmpeg(command):
                     print("错误：添加音频失败")
+                    # 确保输出路径有 .mp4 扩展名
+                    output_path = self.output_path if self.output_path.lower().endswith('.mp4') else f"{self.output_path}.mp4"
                     # 如果添加音频失败，尝试直接使用视频
-                    shutil.copy2(temp_video, self.output_path)
+                    shutil.copy2(temp_video, output_path)
+                    self.output_path = output_path  # 更新输出路径
                     print("已保存无音频版本")
             else:
+                # 确保输出路径有 .mp4 扩展名
+                output_path = self.output_path if self.output_path.lower().endswith('.mp4') else f"{self.output_path}.mp4"
                 # 如果没有音频，直接复制视频
-                shutil.copy2(temp_video, self.output_path)
+                shutil.copy2(temp_video, output_path)
+                self.output_path = output_path  # 更新输出路径
 
             # 清理临时文件
             print("清理资源...")
