@@ -36,56 +36,31 @@ class VideoEditor:
         """提取视频片段（不带音频）"""
         command = [
             'ffmpeg', '-y',
-            '-ss', str(start),  # 起始时间
-            '-i', self.input_path,  # 将 -ss 放在 -i 之前，以提高精度
+            '-i', self.input_path,
+            '-ss', str(start),
             '-t', str(duration),
             '-an',  # 不要音频
             '-c:v', 'copy',  # 直接复制视频流，不重新编码
-            '-avoid_negative_ts', '1',  # 避免负时间戳
             output_path
         ]
         return self._run_ffmpeg(command)
 
     def _concat_videos(self, video_files, output_path):
         """合并视频文件"""
-        # 首先创建一个临时的 filter complex 文件
-        filter_complex = []
-        inputs = []
-        for i, video_file in enumerate(video_files):
-            inputs.extend(['-i', video_file])
-            filter_complex.append(f'[{i}:v]')
-        
-        filter_str = ''.join(filter_complex) + f'concat=n={len(video_files)}:v=1 [outv]'
-        
-        command = [
-            'ffmpeg', '-y'
-        ]
-        command.extend(inputs)
-        command.extend([
-            '-filter_complex', filter_str,
-            '-map', '[outv]',
-            '-c:v', 'copy',  # 尝试直接复制视频流
-            output_path
-        ])
-        
-        # 如果使用 filter_complex 失败，回退到 concat demuxer
-        if not self._run_ffmpeg(command):
-            print("使用 filter_complex 合并失败，尝试使用 concat demuxer...")
-            list_file = os.path.join(self.temp_dir, 'file_list.txt')
-            with open(list_file, 'w') as f:
-                for video_file in video_files:
-                    f.write(f"file '{video_file}'\n")
+        list_file = os.path.join(self.temp_dir, 'file_list.txt')
+        with open(list_file, 'w') as f:
+            for video_file in video_files:
+                f.write(f"file '{video_file}'\n")
 
-            command = [
-                'ffmpeg', '-y',
-                '-f', 'concat',
-                '-safe', '0',
-                '-i', list_file,
-                '-c', 'copy',
-                output_path
-            ]
-            return self._run_ffmpeg(command)
-        return True
+        command = [
+            'ffmpeg', '-y',
+            '-f', 'concat',
+            '-safe', '0',
+            '-i', list_file,
+            '-c', 'copy',  # 直接复制，不重新编码
+            output_path
+        ]
+        return self._run_ffmpeg(command)
 
     def _detect_scenes(self):
         """使用 PySceneDetect 检测场景"""
