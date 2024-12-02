@@ -226,10 +226,10 @@ class VideoEditor:
             print(f"选中场景总时长: {total_selected_duration:.1f}秒")
 
             # 提取音频（使用计算出的总时长）
-            audio_path = os.path.join(self.temp_dir, 'audio.aac')
-            if not self._extract_audio(total_selected_duration, audio_path):
+            temp_audio = os.path.join(self.temp_dir, 'audio.aac')
+            if not self._extract_audio(total_selected_duration, temp_audio):
                 print("警告：提取音频失败")
-                audio_path = None
+                temp_audio = None
 
             # 提取选中的场景
             print("提取选中的场景...")
@@ -250,28 +250,30 @@ class VideoEditor:
             print("合并场景...")
             if self.progress_callback:
                 self.progress_callback(80)  # 80% 进度
-            no_audio_output = os.path.join(self.temp_dir, 'no_audio_output.mp4')
-            if not self._concat_videos(video_segments, no_audio_output):
+            temp_video = os.path.join(self.temp_dir, 'no_audio_output.mp4')
+            if not self._concat_videos(video_segments, temp_video):
                 print("错误：合并视频片段失败")
                 return False
 
             # 添加音频（如果有）
-            if audio_path:
+            if temp_audio:
                 print("添加音频...")
-                # 确保输出路径有 .mp4 扩展名
-                output_path = self.output_path if self.output_path.lower().endswith('.mp4') else f"{self.output_path}.mp4"
-                if not self._add_audio_to_video(no_audio_output, audio_path, output_path):
+                command = [
+                    'ffmpeg', '-y',
+                    '-i', temp_video,
+                    '-i', temp_audio,
+                    '-c:v', 'copy',  # 保持视频流不变
+                    '-c:a', 'aac',
+                    '-b:a', '320k',  # 使用最高音频比特率
+                    '-shortest',  # 使用最短的流的长度
+                    self.output_path
+                ]
+                if not self._run_ffmpeg(command):
                     print("错误：添加音频失败")
-                    # 如果添加音频失败，尝试直接使用视频
-                    shutil.copy2(no_audio_output, output_path)
-                    self.output_path = output_path
-                    print("已保存无音频版本")
+                    return False
             else:
-                # 确保输出路径有 .mp4 扩展名
-                output_path = self.output_path if self.output_path.lower().endswith('.mp4') else f"{self.output_path}.mp4"
                 # 如果没有音频，直接复制视频
-                shutil.copy2(no_audio_output, output_path)
-                self.output_path = output_path  # 更新输出路径
+                shutil.copy2(temp_video, self.output_path)
 
             # 清理临时文件
             print("清理资源...")
