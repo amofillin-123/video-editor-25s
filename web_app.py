@@ -45,7 +45,8 @@ def upload_file():
 
         # 生成唯一的文件名
         filename = secure_filename(file.filename)
-        unique_filename = f"{str(uuid.uuid4())}_{filename}"
+        file_ext = os.path.splitext(filename)[1].lower()  # 获取文件扩展名
+        unique_filename = f"{str(uuid.uuid4())}{file_ext}"
         input_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
         
         # 确保上传目录存在
@@ -55,8 +56,8 @@ def upload_file():
         file.save(input_path)
         app.logger.info(f'文件已保存到: {input_path}')
         
-        # 设置输出文件路径
-        output_filename = f"edited_{unique_filename}"
+        # 设置输出文件路径，确保包含扩展名
+        output_filename = f"edited_{unique_filename}"  # 现在包含了原始文件的扩展名
         output_path = os.path.join(app.config['UPLOAD_FOLDER'], output_filename)
         
         try:

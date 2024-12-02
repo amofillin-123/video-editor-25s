@@ -225,15 +225,19 @@ class VideoEditor:
                     'ffmpeg', '-y',
                     '-i', temp_video,
                     '-i', temp_audio,
-                    '-c:v', 'copy',  # 保持视频流不变
-                    '-c:a', 'aac',
-                    '-b:a', '320k',  # 使用最高音频比特率
-                    '-shortest',  # 使用最短的流的长度
+                    '-c:v', 'copy',     # 保持视频流不变
+                    '-c:a', 'aac',      # 使用 AAC 编码器
+                    '-strict', 'experimental',  # 允许实验性编码器
+                    '-map', '0:v:0',    # 从第一个输入取视频
+                    '-map', '1:a:0',    # 从第二个输入取音频
+                    '-shortest',        # 使用最短的流的长度
                     self.output_path
                 ]
                 if not self._run_ffmpeg(command):
                     print("错误：添加音频失败")
-                    return False
+                    # 如果添加音频失败，尝试直接使用视频
+                    shutil.copy2(temp_video, self.output_path)
+                    print("已保存无音频版本")
             else:
                 # 如果没有音频，直接复制视频
                 shutil.copy2(temp_video, self.output_path)
